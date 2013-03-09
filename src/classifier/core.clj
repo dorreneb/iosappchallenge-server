@@ -19,16 +19,19 @@
 
 (defn update-graph [connection message]
   (let [json (parse-string message)]
-    (send graph conj message)
-    (doseq [c @connections]
-      (.send c (generate-string {:type :update :message message})))))
+    (dosync
+     (send graph conj message)
+     (doseq [c @connections]
+       (.send c (generate-string {:type :update :message message}))))))
 
 (.add server "/graph"
       (proxy [WebSocketHandler] []
-        (onOpen [c] (register-connection c))
+        (onOpen [c] (do (println "Connected: " c)
+                        (register-connection c)))
         (onMessage [c m] (do (println c ":" m)
                              (update-graph c m)))
-        (onClose [c] (unregister-connection c))))
+        (onClose [c] (do (println "Disconnected: " c)
+                         (unregister-connection c)))))
 
 (defn -main [& args]
   (.start server))
