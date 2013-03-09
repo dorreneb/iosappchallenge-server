@@ -10,12 +10,12 @@
 
 (defn register-connection [connection]
   (dosync
-   (commute connections disj connection))
+   (commute connections conj connection))
   (.send connection (generate-string {:type :init :message @graph})))
 
 (defn unregister-connection [connection]
   (dosync
-   (commute connections conj connection)))
+   (commute connections disj connection)))
 
 (defmulti update-graph :type)
 
@@ -40,3 +40,4 @@
 (defn -main [& args]
   (.start server))
 
+(count @connections)
