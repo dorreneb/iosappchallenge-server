@@ -17,17 +17,14 @@
   (dosync
    (commute connections conj connection)))
 
-(defn update-graph [connection message]
-  (let [json (parse-string message)]
-    (dosync
-     (send graph conj message)
-     (doseq [c @connections]
-       (.send c (generate-string {:type :update :message message}))))))
-
 (defmulti update-graph :type)
 
 (defmethod update-graph "create" [message]
-  (println "Creating " message))
+  (println "Creating " message)
+  (dosync
+   (send graph conj message)
+   (doseq [c @connections]
+     (.send c (generate-string {:type :create :message message})))))
 
 (defmethod update-graph :default [a]
   (println "Received an unrecognized message: " a))
