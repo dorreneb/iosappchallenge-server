@@ -4,7 +4,7 @@
            [org.webbitserver.handler StaticFileHandler]))
 
 (def connections (ref #{}))
-(def graph (agent {:data {}}))
+(def graph (agent []))
 
 (defonce server (WebServers/createWebServer 8080))
 
@@ -19,7 +19,7 @@
 
 (defn update-graph [connection message]
   (let [json (parse-string message)]
-    (send graph assoc :data message)
+    (send graph conj message)
     (doseq [c @connections]
       (.send c (generate-string {:type :update :message message})))))
 
