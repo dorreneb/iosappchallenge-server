@@ -1,4 +1,4 @@
 lein upgrade
 lein deps
-lein uberjar classifier.core
+lein uberjar
 cp target/*-standalone.jar ~/run.jar
