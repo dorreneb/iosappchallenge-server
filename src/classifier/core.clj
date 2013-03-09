@@ -11,7 +11,7 @@
 (defn register-connection [connection]
   (dosync
    (commute connections conj connection))
-  (.send connection (generate-string {:type :init :message @graph})))
+  (.send connection (generate-string {:type :init :body @graph})))
 
 (defn unregister-connection [connection]
   (dosync
@@ -20,11 +20,12 @@
 (defmulti update-graph :type)
 
 (defmethod update-graph "create" [message]
-  (println "Creating " message)
+  (println "Received creation event: " message)
   (dosync
-   (send graph conj message)
+   (send graph conj (:body message))
    (doseq [c @connections]
-     (.send c (generate-string {:type :create :message message})))))
+     (.send c (generate-string (merge {:type :create}
+                                      (select-keys message [:body])))))))
 
 (defmethod update-graph :default [a]
   (println "Received an unrecognized message: " a))
@@ -40,4 +41,3 @@
 (defn -main [& args]
   (.start server))
 
-(count @connections)
