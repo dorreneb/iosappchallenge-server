@@ -24,12 +24,19 @@
      (doseq [c @connections]
        (.send c (generate-string {:type :update :message message}))))))
 
+(defmulti update-graph :type)
+
+(defmethod update-graph "create" [message]
+  (println "Creating " message))
+
+(defmethod update-graph :default [a]
+  (println "Received an unrecognized message: " a))
+
 (.add server "/graph"
       (proxy [WebSocketHandler] []
         (onOpen [c] (do (println "Connected: " c)
                         (register-connection c)))
-        (onMessage [c m] (do (println c ":" m)
-                             (update-graph c m)))
+        (onMessage [c m] (update-graph (:type (parse-string m true))))
         (onClose [c] (do (println "Disconnected: " c)
                          (unregister-connection c)))))
 
