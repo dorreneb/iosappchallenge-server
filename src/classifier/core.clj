@@ -20,7 +20,7 @@
 (defmulti update-graph :type)
 
 (defmethod update-graph "create" [{:keys [session-id body] :as message}]
-  (println "Received creation event on " session-id ": " message)
+  (println "Received creation event on" session-id ":" message)
   (dosync
    (send (get-in @sessions [session-id :graph]) conj body)
    (doseq [c @(get-in @sessions [session-id :connections])]
