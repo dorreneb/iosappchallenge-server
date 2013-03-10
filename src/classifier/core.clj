@@ -45,11 +45,11 @@
 (defn create-new-user-session [connection]
   (let [session-id (java.util.UUID/randomUUID)]
     (add-session! session-id)
-    (.send c (generate-string {:session-id session-id}))))
+    (.send connection (generate-string {:session-id session-id}))))
 
 (.add server "/create-session"
       (proxy [WebSocketHandler] []
-        (onOpen [c] (create-new-user-session connection))
+        (onOpen [c] (create-new-user-session c))
         (onMessage [c m])
         (onClose [c])))
 
