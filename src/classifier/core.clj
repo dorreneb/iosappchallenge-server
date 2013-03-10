@@ -30,13 +30,20 @@
 (defmethod update-graph :default [a]
   (println "Received an unrecognized message: " a))
 
-(.add server "/graph"
+(.add server "/create-session"
       (proxy [WebSocketHandler] []
-        (onOpen [c] (do (println "Connected: " c)
-                        (register-connection c)))
-        (onMessage [c m] (update-graph (:type (parse-string m true))))
-        (onClose [c] (do (println "Disconnected: " c)
-                         (unregister-connection c)))))
+        (onOpen [c] (let [session-id (java.util.UUID/randomUUID)]
+                      (add-session! session-id)
+                      (.send c (generate-string {:session-id session-id}))))))
+
+(defn add-session! [session-id]
+  (.add server (str "/graph/" session-id)
+        (proxy [WebSocketHandler] []
+          (onOpen [c] (do (println "Connected: " c)
+                          (register-connection c)))
+          (onMessage [c m] (update-graph (:type (parse-string m true))))
+          (onClose [c] (do (println "Disconnected: " c)
+                           (unregister-connection c))))))
 
 (defn -main [& args]
   (.start server))
