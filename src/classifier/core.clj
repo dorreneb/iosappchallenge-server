@@ -4,51 +4,54 @@
   (:import [org.webbitserver WebServer WebServers WebSocketHandler HttpHandler]
            [org.webbitserver.handler StaticFileHandler]))
 
-(def connections (ref #{}))
-(def graph (agent []))
+(def sessions (ref {}))
 
 (defonce server (WebServers/createWebServer 8080))
 
-(defn register-connection [connection]
+(defn register-connection [id connection]
   (dosync
-   (commute connections conj connection))
-  (.send connection (generate-string {:type :init :body @graph})))
+   (commute (get-in @sessions [id :connections]) conj connection))
+  (.send connection (generate-string {:type :init :body @(get-in @sessions [id :graph])})))
 
-(defn unregister-connection [connection]
+(defn unregister-connection [id connection]
   (dosync
-   (commute connections disj connection)))
+   (commute (get-in @sessions [id :connections]) disj connection)))
 
 (defmulti update-graph :type)
 
-(defmethod update-graph "create" [message]
+(defmethod update-graph "create" [{:keys [session-id body] :as message}]
   (println "Received creation event: " message)
   (dosync
-   (send graph conj (:body message))
-   (doseq [c @connections]
+   (send (get-in @sessions [session-id :graph]) conj body)
+   (doseq [c @(get-in @sessions [session-id :connections])]
      (.send c (generate-string (merge {:type :create}
                                       (select-keys message [:body])))))))
 
-(defmethod update-graph :default [a]
-  (println "Received an unrecognized message: " a))
+(defmethod update-graph :default [message]
+  (println "Received an unrecognized message: " message))
 
 (defn add-session! [session-id]
+  (dosync
+   (commute sessions assoc session-id {:connections (ref #{}) :graph (agent [])}))
   (.add server (str "/graph/" session-id)
         (proxy [WebSocketHandler] []
-          (onOpen [c]      (register-connection c))
-          (onMessage [c m] (update-graph (:type (parse-string m true))))
-          (onClose [c]     (unregister-connection c)))))
+          (onOpen [c]      (register-connection session-id c))
+          (onMessage [c m] (update-graph (assoc (:type (parse-string m true)) :session-id session-id)))
+          (onClose [c]     (unregister-connection session-id c)))))
 
 (.add server "/create-session"
       (proxy [WebSocketHandler] []
         (onOpen [c] (let [session-id (java.util.UUID/randomUUID)]
                       (add-session! session-id)
-                      (.send c (generate-string {:session-id session-id}))))))
+                      (.send c (generate-string {:session-id session-id}))))
+        (onMessage [c m])
+        (onClose [c])))
 
 (with-pre-hook! #'register-connection
-  (fn [connection] (println "Connected: " connection)))
+  (fn [id connection] (println "Connected: " connection)))
 
 (with-pre-hook! #'unregister-connection
-  (fn [connection] (println "Unregistered: " connection)))
+  (fn [id connection] (println "Unregistered: " connection)))
 
 (defn -main [& args]
   (.start server))
