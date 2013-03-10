@@ -20,7 +20,7 @@
 (defmulti update-graph :type)
 
 (defmethod update-graph "create" [{:keys [session-id body] :as message}]
-  (println "Received creation event: " message)
+  (println "Received creation event on " session-id ": " message)
   (dosync
    (send (get-in @sessions [session-id :graph]) conj body)
    (doseq [c @(get-in @sessions [session-id :connections])]
@@ -30,28 +30,37 @@
 (defmethod update-graph :default [message]
   (println "Received an unrecognized message: " message))
 
-(defn add-session! [session-id]
-  (dosync
-   (commute sessions assoc session-id {:connections (ref #{}) :graph (agent [])}))
+(defn add-session-route [session-id]
   (.add server (str "/graph/" session-id)
         (proxy [WebSocketHandler] []
           (onOpen [c]      (register-connection session-id c))
           (onMessage [c m] (update-graph (assoc (:type (parse-string m true)) :session-id session-id)))
           (onClose [c]     (unregister-connection session-id c)))))
 
+(defn add-session! [session-id]
+  (dosync
+   (commute sessions assoc session-id {:connections (ref #{}) :graph (agent [])}))
+  (add-session-route session-id))
+
+(defn create-new-user-session [connection]
+  (let [session-id (java.util.UUID/randomUUID)]
+    (add-session! session-id)
+    (.send c (generate-string {:session-id session-id}))))
+
 (.add server "/create-session"
       (proxy [WebSocketHandler] []
-        (onOpen [c] (let [session-id (java.util.UUID/randomUUID)]
-                      (add-session! session-id)
-                      (.send c (generate-string {:session-id session-id}))))
+        (onOpen [c] (create-new-user-session connection))
         (onMessage [c m])
         (onClose [c])))
 
 (with-pre-hook! #'register-connection
-  (fn [id connection] (println "Connected: " connection)))
+  (fn [id connection] (println "Registered connection on " id ":" connection)))
 
 (with-pre-hook! #'unregister-connection
-  (fn [id connection] (println "Unregistered: " connection)))
+  (fn [id connection] (println "Unregistered connection on " id ": " connection)))
+
+(with-pre-hook! #'add-session!
+  (fn [session-id] (println "Creating new session " session-id)))
 
 (defn -main [& args]
   (.start server))
