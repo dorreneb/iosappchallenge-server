@@ -22,4 +22,6 @@
      (-> connection db (d/entity id)))
    (q '[:find ?e :where [?e :graphs/session-id]] (db connection))))
 
-(all-sessions)
+(defn graph-for-session-id [id]
+  (q '[:find ?e :in $ ?id :where [?e :graphs/session-id ?id]] (db connection) id))
+
