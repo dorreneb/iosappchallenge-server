@@ -34,7 +34,7 @@
   (.add server (str "/graph/" session-id)
         (proxy [WebSocketHandler] []
           (onOpen [c]      (register-connection session-id c))
-          (onMessage [c m] (update-graph (assoc (:type (parse-string m true)) :session-id session-id)))
+          (onMessage [c m] (update-graph (assoc (parse-string m true) :session-id session-id)))
           (onClose [c]     (unregister-connection session-id c)))))
 
 (defn add-session! [session-id]
