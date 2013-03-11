@@ -6,7 +6,6 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.webbitserver/webbit "0.4.3"]
                  [cheshire "5.0.2"]
-                 [dire "0.3.0"]
-                 [com.datomic/datomic-free "0.8.3664"]]
+                 [dire "0.3.0"]]
   :main classifier.core)
 
