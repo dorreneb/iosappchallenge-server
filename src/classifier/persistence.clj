@@ -1,7 +1,7 @@
 (ns classifier.persistence
   (:require [datomic.api :refer [q db] :as d]))
 
-(def uri "datomic:free://localhost:4334/fake-db")
+(def uri "datomic:free://localhost:4334/graphs")
 (d/create-database uri)
 
 (defonce connection (d/connect uri))
@@ -9,12 +9,12 @@
 
 @(d/transact connection schema)
 
-(defn update-session [session-id data]
+(defn- update-session [session-id data]
   (d/transact
    connection
    [{:graphs/session-id session-id
      :db/id #db/id [:db.part/user]
-     :graphs/graph (pr-str @data)}]))
+     :graphs/graph (pr-str data)}]))
 
 (defn all-sessions []
   (map
@@ -24,4 +24,8 @@
 
 (defn graph-for-session-id [id]
   (q '[:find ?e :in $ ?id :where [?e :graphs/session-id ?id]] (db connection) id))
+
+(defn persist-session [session-id]
+  (fn [_ _ _ state]
+    (update-session session-id state)))
 
