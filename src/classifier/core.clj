@@ -59,18 +59,19 @@
   (dosync
    (commute (get-in @sessions [id :connections]) disj connection)))
 
-(defmulti update-graph :type)
+(defn unknown-api-call [message])
 
-(defmethod update-graph "create" [{:keys [session-id body] :as message}]
-  (println "Received creation event on" session-id ":" message)
+(defn create-box [{:keys [session-id body] :as message}]
   (dosync
    (send (get-in @sessions [session-id :graph]) conj body)
    (doseq [c @(get-in @sessions [session-id :connections])]
      (.send c (generate-string (merge {:type :create}
                                       (select-keys message [:body])))))))
 
-(defmethod update-graph :default [message]
-  (println "Received an unrecognized message: " message))
+(defmulti update-graph :type)
+
+(defmethod update-graph "create" [message] (create-box message))
+(defmethod update-graph :default [message] (unknown-api-call message))
 
 (defn add-session-route [session-id]
   (.add server (str "/graph/" session-id)
@@ -99,13 +100,38 @@
 ;;;;;;;;;;;;; Logging Hooks ;;;;;;;;;;;;;;;
 
 (with-pre-hook! #'register-connection
-  (fn [id connection] (println "Registered connection on " id ":" connection)))
+  (fn [id connection]
+    (println "-------------------------------------------------")
+    (println "Registered connection on:" id)
+    (println "\t" connection)
+    (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unregister-connection
-  (fn [id connection] (println "Unregistered connection on " id ": " connection)))
+  (fn [id connection]
+    (println "-------------------------------------------------")
+    (println "Unregistered connection on:" id)
+    (println "\t" connection)
+    (println "-------------------------------------------------")))
 
 (with-pre-hook! #'add-session!
-  (fn [session-id _] (println "Creating new session " session-id)))
+  (fn [session-id _]
+    (println "-------------------------------------------------")
+    (println "Creating new graph session:" session-id)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'create-box
+  (fn [{:keys [session-id] :as message}]
+    (println "-------------------------------------------------")
+    (println "Received creation event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'unknown-api-call
+  (fn [message]
+    (println "-------------------------------------------------")
+    (println "Received an unrecognized message:")
+    (println "\t" message)
+    (println "-------------------------------------------------")))
 
 (defn -main [& args]
   (generate-routes)
