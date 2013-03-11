@@ -9,4 +9,17 @@
 
 @(d/transact connection schema)
 
+(defn update-session [session-id data]
+  (d/transact
+   connection
+   [{:graphs/session-id session-id
+     :db/id #db/id [:db.part/user]
+     :graphs/graph (pr-str @data)}]))
 
+(defn all-sessions []
+  (map
+   (fn [[id]]
+     (-> connection db (d/entity id)))
+   (q '[:find ?e :where [?e :graphs/session-id]] (db connection))))
+
+(all-sessions)
