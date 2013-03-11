@@ -27,5 +27,6 @@
 
 (defn persist-session [session-id]
   (fn [_ _ _ state]
+    (println "Updating via Datomic.")
     (update-session session-id state)))
 

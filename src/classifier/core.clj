@@ -1,6 +1,7 @@
 (ns classifier.core
   (:require [cheshire.core :refer [generate-string parse-string]]
-            [dire.core :refer [with-pre-hook!]])
+            [dire.core :refer [with-pre-hook!]]
+            [classifier.persistence :refer [persist-session]])
   (:import [org.webbitserver WebServer WebServers WebSocketHandler HttpHandler]
            [org.webbitserver.handler StaticFileHandler]))
 
@@ -34,13 +35,14 @@
   (.add server (str "/graph/" session-id)
         (proxy [WebSocketHandler] []
           (onOpen [c]      (register-connection session-id c))
-          (onMessage [c m] (update-graph (assoc (parse-string m true) :session-id session-id)))
+          (onMessage [c m] (update-graph (assoc (:type (parse-string m true)) :session-id session-id)))
           (onClose [c]     (unregister-connection session-id c)))))
 
 (defn add-session! [session-id]
   (dosync
    (commute sessions assoc session-id {:connections (ref #{}) :graph (agent [])}))
-  (add-session-route session-id))
+  (add-session-route session-id)
+  (add-watch (get-in @sessions [session-id :graph]) :datomic (persist-session session-id)))
 
 (defn create-new-user-session [connection]
   (let [session-id (java.util.UUID/randomUUID)]
