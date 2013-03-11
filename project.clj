@@ -7,6 +7,6 @@
                  [org.webbitserver/webbit "0.4.3"]
                  [cheshire "5.0.2"]
                  [dire "0.3.0"]
-                 [com.datomic/datomic-free "0.8.3664"]]
+                 [com.datomic/datomic-free "0.8.3826"]]
   :main classifier.core)
 
