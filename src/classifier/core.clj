@@ -68,14 +68,14 @@
 
 (defn create-box [{:keys [session-id body] :as message} requester]
   (dosync
-   (send (get-in @sessions [session-id :graph]) conj (:body (strip-locals (:type message))))
-   (.send requester (generate-string (merge {:type :create} (select-keys (:type message) [:body]))))
+   (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
+   (.send requester (generate-string (merge {:type :create} (select-keys message [:body]))))
    (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
-     (.send c (generate-string (merge {:type :create} (strip-locals (select-keys (:type message) [:body]))))))))
+     (.send c (generate-string (merge {:type :create} (strip-locals (select-keys message [:body]))))))))
 
 (defmulti update-graph
   (fn [message connection]
-    (:type (:type message))))
+    (:type message)))
 
 (defmethod update-graph "create" [message requester] (create-box message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
@@ -109,7 +109,7 @@
 
 (defmulti dispatch-session-command
   (fn [_ message]
-    (:type (:type (parse-string message true)))))
+    (:type (parse-string message true))))
 
 (defmethod dispatch-session-command "create" [connection message]
   (create-new-user-session connection))
