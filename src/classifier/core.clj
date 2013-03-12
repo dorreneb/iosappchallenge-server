@@ -89,9 +89,13 @@
 (defn list-user-session-keys [connection]
   (.send connection (generate-string (map :graphs/session-id (all-sessions)))))
 
+(defn persist-empty-graph [session-id]
+  (send (get-in @sessions [session-id :graph]) identity))
+
 (defn create-new-user-session [connection]
   (let [session-id (java.util.UUID/randomUUID)]
     (add-session! session-id [])
+    (persist-empty-graph session-id)
     (.send connection (generate-string {:session-id session-id}))))
 
 (defn unknown-session-call [connection message])
@@ -160,6 +164,13 @@
     (println "-------------------------------------------------")
     (println "Received an unrecognized session message:")
     (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'persist-empty-graph
+  (fn [session-id]
+    (println "-------------------------------------------------")
+    (println "Saving a new graph via Datomic for:")
+    (println "\t" session-id)
     (println "-------------------------------------------------")))
 
 (defn -main [& args]
