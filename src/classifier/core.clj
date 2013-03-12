@@ -21,10 +21,11 @@
 
 @(d/transact connection schema)
 
-(defn- update-session [session-id data]
+(defn update-session [session-id graph-name data]
   (d/transact
    connection
    [{:graphs/session-id session-id
+     :graphs/name graph-name
      :db/id #db/id [:db.part/user]
      :graphs/graph (pr-str data)}]))
 
@@ -34,17 +35,19 @@
      (-> connection db (d/entity id)))
    (q '[:find ?e :where [?e :graphs/session-id]] (db connection))))
 
-(defn persist-session [session-id]
+(defn persist-session [session-id graph-name]
   (fn [_ _ _ state]
     (println "Updating via Datomic.")
     (if (string? session-id)
-      (update-session (java.util.UUID/fromString session-id) state)
-      (update-session session-id state))))
+      (update-session (java.util.UUID/fromString session-id) graph-name state)
+      (update-session session-id graph-name state))))
 
 (defn generate-routes []
   (doseq [session (all-sessions)]
     (add-session-route (str (:graphs/session-id session)))
-    (add-session! (str (:graphs/session-id session)) (read-string (:graphs/graph session)))))
+    (add-session! (str (:graphs/session-id session))
+                  (:graphs/name session)
+                  (read-string (:graphs/graph session)))))
 
 ;;;;;;;;;;;;;;; In Memory Sessions ;;;;;;;;;;;;;;;;;
 
@@ -103,23 +106,27 @@
           (onMessage [c m] (update-graph (assoc (parse-string m true) :session-id session-id) c))
           (onClose [c]     (unregister-connection session-id c)))))
 
-(defn add-session! [session-id initial-state]
+(defn add-session! [session-id graph-name initial-state]
   (dosync
    (commute sessions assoc session-id {:connections (ref #{}) :graph (agent initial-state)}))
   (add-session-route session-id)
-  (add-watch (graph-agent session-id) :datomic (persist-session session-id)))
+  (add-watch (graph-agent session-id) :datomic (persist-session session-id graph-name)))
+
+(defn describe-open-session [session]
+  {:session-id (:graphs/session-id session)
+   :session-name (:graphs/name session)})
 
 (defn list-user-session-keys [connection]
-  (.send connection (generate-string {:sessions (map :graphs/session-id (all-sessions))})))
+  (.send connection (generate-string {:sessions (map describe-open-session (all-sessions))})))
 
-(defn persist-empty-graph [session-id]
+(defn persist-empty-graph [session-id graph-name]
   (send (graph-agent session-id) identity))
 
-(defn create-new-user-session [connection]
+(defn create-new-user-session [connection graph-name]
   (let [session-id (uuid)]
-    (add-session! session-id [])
-    (persist-empty-graph session-id)
-    (.send connection (generate-string {:session-id session-id}))))
+    (add-session! session-id graph-name [])
+    (persist-empty-graph session-id graph-name)
+    (.send connection (generate-string {:session-id session-id :graph-name graph-name}))))
 
 (defn unknown-session-call [connection message])
 
@@ -128,7 +135,7 @@
     (:type (parse-string message true))))
 
 (defmethod dispatch-session-command "create" [connection message]
-  (create-new-user-session connection))
+  (create-new-user-session connection (:spec-name (parse-string message true))))
 
 (defmethod dispatch-session-command :default [connection message]
   (unknown-session-call connection message))
@@ -143,55 +150,48 @@
 
 (with-pre-hook! #'register-connection
   (fn [id connection]
-    (println "-------------------------------------------------")
     (println "Registered connection on:" id)
     (println "\t" connection)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unregister-connection
   (fn [id connection]
-    (println "-------------------------------------------------")
     (println "Unregistered connection on:" id)
     (println "\t" connection)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'add-session!
-  (fn [session-id _]
-    (println "-------------------------------------------------")
+  (fn [session-id graph-name _]
     (println "Creating new graph session:" session-id)
+    (println "\tNamed" graph-name)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'create-box
   (fn [{:keys [session-id] :as message} connection]
-    (println "-------------------------------------------------")
     (println "Received creation event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unknown-api-call
   (fn [message connection]
-    (println "-------------------------------------------------")
     (println "Received an unrecognized message:")
     (println "\t" message)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'list-user-session-keys
   (fn [connection]
-    (println "-------------------------------------------------")
     (println "Listing session keys for:")
     (println "\t" connection)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unknown-session-call
   (fn [connection message]
-    (println "-------------------------------------------------")
     (println "Received an unrecognized session message:")
     (println "\t" message)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'persist-empty-graph
-  (fn [session-id]
-    (println "-------------------------------------------------")
+  (fn [session-id graph-name]
     (println "Saving a new graph via Datomic for:")
     (println "\t" session-id)
     (println "-------------------------------------------------")))
