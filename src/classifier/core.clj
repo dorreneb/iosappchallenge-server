@@ -73,9 +73,9 @@
   (let [body (assoc body :id (uuid))]
     (dosync
      (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
-     (.send requester (generate-string (merge {:type :create} {:body body})))
+     (.send requester (generate-string (merge {:type :create-box} {:body body})))
      (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
-       (.send c (generate-string (merge {:type :create} {:body (strip-locals body)})))))))
+       (.send c (generate-string (merge {:type :create-box} {:body (strip-locals body)})))))))
 
 (defmulti update-graph
   (fn [message connection]
