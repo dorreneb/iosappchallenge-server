@@ -86,15 +86,30 @@
   (add-session-route session-id)
   (add-watch (get-in @sessions [session-id :graph]) :datomic (persist-session session-id)))
 
+(defn list-user-session-keys [connection]
+  (.send connection (generate-string (map :graphs/session-id (all-sessions)))))
+
 (defn create-new-user-session [connection]
   (let [session-id (java.util.UUID/randomUUID)]
     (add-session! session-id [])
     (.send connection (generate-string {:session-id session-id}))))
 
-(.add server "/create-session"
+(defn unknown-session-call [connection message])
+
+(defmulti dispatch-session-command
+  (fn [_ message]
+    (:type (:type (parse-string message true)))))
+
+(defmethod dispatch-session-command "create" [connection message]
+  (create-new-user-session connection))
+
+(defmethod dispatch-session-command :default [connection message]
+  (unknown-session-call connection message))
+
+(.add server "/sessions"
       (proxy [WebSocketHandler] []
-        (onOpen [c] (create-new-user-session c))
-        (onMessage [c m])
+        (onOpen [c] (list-user-session-keys c))
+        (onMessage [c m] (dispatch-session-command c m))
         (onClose [c])))
 
 ;;;;;;;;;;;;; Logging Hooks ;;;;;;;;;;;;;;;
@@ -130,6 +145,20 @@
   (fn [message]
     (println "-------------------------------------------------")
     (println "Received an unrecognized message:")
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'list-user-session-keys
+  (fn [connection]
+    (println "-------------------------------------------------")
+    (println "Listing session keys for:")
+    (println "\t" connection)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'unknown-session-call
+  (fn [connection message]
+    (println "-------------------------------------------------")
+    (println "Received an unrecognized session message:")
     (println "\t" message)
     (println "-------------------------------------------------")))
 
