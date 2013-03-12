@@ -34,9 +34,6 @@
      (-> connection db (d/entity id)))
    (q '[:find ?e :where [?e :graphs/session-id]] (db connection))))
 
-(defn graph-for-session-id [id]
-  (q '[:find ?e :in $ ?id :where [?e :graphs/session-id ?id]] (db connection) id))
-
 (defn persist-session [session-id]
   (fn [_ _ _ state]
     (println "Updating via Datomic.")
@@ -53,12 +50,15 @@
 
 (def sessions (ref {}))
 
+(defn graph-agent [session-id]
+  (get-in @sessions [session-id :graph]))
+
 (defonce server (WebServers/createWebServer 8080))
 
 (defn register-connection [id connection]
   (dosync
    (commute (get-in @sessions [id :connections]) conj connection))
-  (.send connection (generate-string {:type :init :body @(get-in @sessions [id :graph])})))
+  (.send connection (generate-string {:type :init :body @(graph-agent id)})))
 
 (defn unregister-connection [id connection]
   (dosync
@@ -66,16 +66,25 @@
 
 (defn unknown-api-call [message requester])
 
+(defn exclude-client [session-id excluder]
+  (disj @(get-in @sessions [session-id :connections]) excluder))
+
 (defn strip-locals [coll]
   (dissoc coll :locals))
 
-(defn create-box [{:keys [session-id body] :as message} requester]
+(defn dispatch-create-box-to-client [who body]
+  (.send who (generate-string (merge {:type :create-box} {:body body}))))
+
+(defn exclusive-broadcast-create-box [session-id excluder body]
+  (doseq [c (exclude-client session-id excluder)]
+    (dispatch-create-box-to-client c (strip-locals body))))
+
+(defn create-box [{:keys [session-id body] :as message} me]
   (let [body (assoc body :id (uuid))]
     (dosync
-     (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
-     (.send requester (generate-string (merge {:type :create-box} {:body body})))
-     (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
-       (.send c (generate-string (merge {:type :create-box} {:body (strip-locals body)})))))))
+     (send (graph-agent session-id) conj (strip-locals body))
+     (dispatch-create-box-to-client me body)
+     (exclusive-broadcast-create-box session-id me body))))
 
 (defmulti update-graph
   (fn [message connection]
@@ -95,13 +104,13 @@
   (dosync
    (commute sessions assoc session-id {:connections (ref #{}) :graph (agent initial-state)}))
   (add-session-route session-id)
-  (add-watch (get-in @sessions [session-id :graph]) :datomic (persist-session session-id)))
+  (add-watch (graph-agent session-id) :datomic (persist-session session-id)))
 
 (defn list-user-session-keys [connection]
   (.send connection (generate-string {:sessions (map :graphs/session-id (all-sessions))})))
 
 (defn persist-empty-graph [session-id]
-  (send (get-in @sessions [session-id :graph]) identity))
+  (send (graph-agent session-id) identity))
 
 (defn create-new-user-session [connection]
   (let [session-id (uuid)]
