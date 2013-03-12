@@ -64,14 +64,14 @@
 (defn unknown-api-call [message requester])
 
 (defn strip-locals [coll]
-  (assoc coll :body (dissoc (:body coll) :locals)))
+  (dissoc coll :locals))
 
 (defn create-box [{:keys [session-id body] :as message} requester]
   (dosync
    (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
    (.send requester (generate-string (merge {:type :create} (select-keys message [:body]))))
    (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
-     (.send c (generate-string (merge {:type :create} (strip-locals (select-keys message [:body]))))))))
+     (.send c (generate-string (merge {:type :create} {:body (strip-locals body)}))))))
 
 (defmulti update-graph
   (fn [message connection]
