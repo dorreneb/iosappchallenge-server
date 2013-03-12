@@ -8,6 +8,9 @@
 (declare add-session-route)
 (declare add-session!)
 
+(defn uuid []
+  (java.util.UUID/randomUUID))
+
 ;;;;;;;;;;;; Datomic persistence ;;;;;;;;;;;;;;;;;
 
 (def uri "datomic:free://localhost:4334/graphs")
@@ -67,11 +70,12 @@
   (dissoc coll :locals))
 
 (defn create-box [{:keys [session-id body] :as message} requester]
-  (dosync
-   (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
-   (.send requester (generate-string (merge {:type :create} (select-keys message [:body]))))
-   (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
-     (.send c (generate-string (merge {:type :create} {:body (strip-locals body)}))))))
+  (let [body (assoc body :id (uuid))]
+    (dosync
+     (send (get-in @sessions [session-id :graph]) conj (strip-locals body))
+     (.send requester (generate-string (merge {:type :create} {:body body})))
+     (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
+       (.send c (generate-string (merge {:type :create} {:body (strip-locals body)})))))))
 
 (defmulti update-graph
   (fn [message connection]
@@ -100,7 +104,7 @@
   (send (get-in @sessions [session-id :graph]) identity))
 
 (defn create-new-user-session [connection]
-  (let [session-id (java.util.UUID/randomUUID)]
+  (let [session-id (uuid)]
     (add-session! session-id [])
     (persist-empty-graph session-id)
     (.send connection (generate-string {:session-id session-id}))))
