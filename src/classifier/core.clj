@@ -87,7 +87,7 @@
   (add-watch (get-in @sessions [session-id :graph]) :datomic (persist-session session-id)))
 
 (defn list-user-session-keys [connection]
-  (.send connection (generate-string (map :graphs/session-id (all-sessions)))))
+  (.send connection (generate-string {:sessions (map :graphs/session-id (all-sessions))})))
 
 (defn persist-empty-graph [session-id]
   (send (get-in @sessions [session-id :graph]) identity))
