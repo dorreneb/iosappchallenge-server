@@ -1,6 +1,0 @@
-www:
-  type: custom
-  buildscript: build.sh
-  process: java -jar run.jar
-  ports:
-    www: http
