@@ -102,7 +102,7 @@
 
 (defmulti dispatch-session-command
   (fn [_ message]
-    (:type (:type (parse-string message true)))))
+    (:type (parse-string message true))))
 
 (defmethod dispatch-session-command "create" [connection message]
   (create-new-user-session connection))
