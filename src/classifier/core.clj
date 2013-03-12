@@ -53,21 +53,24 @@
 (defn graph-agent [session-id]
   (get-in @sessions [session-id :graph]))
 
+(defn connections-ref [session-id]
+  (get-in @sessions [session-id :connections]))
+
 (defonce server (WebServers/createWebServer 8080))
 
-(defn register-connection [id connection]
+(defn register-connection [session-id connection]
   (dosync
-   (commute (get-in @sessions [id :connections]) conj connection))
-  (.send connection (generate-string {:type :init :body @(graph-agent id)})))
+   (commute (connections-ref session-id) conj connection))
+  (.send connection (generate-string {:type :init :body @(graph-agent session-id)})))
 
-(defn unregister-connection [id connection]
+(defn unregister-connection [session-id connection]
   (dosync
-   (commute (get-in @sessions [id :connections]) disj connection)))
+   (commute (connections-ref session-id) disj connection)))
 
 (defn unknown-api-call [message requester])
 
 (defn exclude-client [session-id excluder]
-  (disj @(get-in @sessions [session-id :connections]) excluder))
+  (disj @(connections-ref session-id) excluder))
 
 (defn strip-locals [coll]
   (dissoc coll :locals))
