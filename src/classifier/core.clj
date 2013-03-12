@@ -37,7 +37,9 @@
 (defn persist-session [session-id]
   (fn [_ _ _ state]
     (println "Updating via Datomic.")
-    (update-session session-id state)))
+    (if (string? session-id)
+      (update-session (java.util.UUID/fromString session-id) state)
+      (update-session session-id state))))
 
 (defn generate-routes []
   (doseq [session (all-sessions)]
@@ -59,25 +61,30 @@
   (dosync
    (commute (get-in @sessions [id :connections]) disj connection)))
 
-(defn unknown-api-call [message])
+(defn unknown-api-call [message requester])
 
-(defn create-box [{:keys [session-id body] :as message}]
+(defn strip-locals [coll]
+  (assoc coll :body (dissoc (:body coll) :locals)))
+
+(defn create-box [{:keys [session-id body] :as message} requester]
   (dosync
-   (send (get-in @sessions [session-id :graph]) conj body)
-   (doseq [c @(get-in @sessions [session-id :connections])]
-     (.send c (generate-string (merge {:type :create}
-                                      (select-keys message [:body])))))))
+   (send (get-in @sessions [session-id :graph]) conj (:body (strip-locals (:type message))))
+   (.send requester (generate-string (merge {:type :create} (select-keys (:type message) [:body]))))
+   (doseq [c (disj @(get-in @sessions [session-id :connections]) requester)]
+     (.send c (generate-string (merge {:type :create} (strip-locals (select-keys (:type message) [:body]))))))))
 
-(defmulti update-graph :type)
+(defmulti update-graph
+  (fn [message connection]
+    (:type (:type message))))
 
-(defmethod update-graph "create" [message] (create-box message))
-(defmethod update-graph :default [message] (unknown-api-call message))
+(defmethod update-graph "create" [message requester] (create-box message requester))
+(defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
   (.add server (str "/graph/" session-id)
         (proxy [WebSocketHandler] []
           (onOpen [c]      (register-connection session-id c))
-          (onMessage [c m] (update-graph (assoc (parse-string m true) :session-id session-id)))
+          (onMessage [c m] (update-graph (assoc (parse-string m true) :session-id session-id) c))
           (onClose [c]     (unregister-connection session-id c)))))
 
 (defn add-session! [session-id initial-state]
@@ -102,7 +109,7 @@
 
 (defmulti dispatch-session-command
   (fn [_ message]
-    (:type (parse-string message true))))
+    (:type (:type (parse-string message true)))))
 
 (defmethod dispatch-session-command "create" [connection message]
   (create-new-user-session connection))
@@ -139,14 +146,14 @@
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'create-box
-  (fn [{:keys [session-id] :as message}]
+  (fn [{:keys [session-id] :as message} connection]
     (println "-------------------------------------------------")
     (println "Received creation event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unknown-api-call
-  (fn [message]
+  (fn [message connection]
     (println "-------------------------------------------------")
     (println "Received an unrecognized message:")
     (println "\t" message)
