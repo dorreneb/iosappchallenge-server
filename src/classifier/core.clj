@@ -102,6 +102,10 @@
 
 (defn unknown-api-call [message requester])
 
+(defn broadcast [session-id message]
+  (doseq [c @(connections-ref session-id)]
+    (.send c message)))
+
 (defn exclude-client [session-id excluder]
   (disj @(connections-ref session-id) excluder))
 
@@ -164,8 +168,14 @@
 (defn graph-revisions [{:keys [session-id body] :as message} me]
   (.send me (generate-string {:revisions (revisions (session (uuid session-id)))})))
 
-(defn spec-revision [{:keys [session-id transaction-id] :as message} me]
+(defn spec-revision [{:keys [transaction-id] :as message} me]
   (.send me (generate-string {:revision (revision transaction-id)})))
+
+(defn revert [{:keys [session-id transaction-id]}]
+  (let [spec (revision transaction-id)]
+    (dosync
+     (send (graph-agent session-id) (constantly spec))
+     (broadcast session-id (generate-string {:revert @(graph-agent session-id)})))))
 
 (defmulti update-graph
   (fn [message connection]
@@ -177,6 +187,7 @@
 (defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
 (defmethod update-graph "revisions" [message requester] (graph-revisions message requester))
 (defmethod update-graph "spec-revision" [message requester] (spec-revision message requester))
+(defmethod update-graph "revert" [message _] (revert message))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -282,6 +293,12 @@
   (fn [{:keys [session-id] :as message} connection]
     (println "Getting revision on:" session-id)
     (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'revert
+  (fn [{:keys [session-id transaction-id] :as message}]
+    (println "Reverting spec on:" session-id)
+    (println "\t:" message)
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'unknown-api-call
