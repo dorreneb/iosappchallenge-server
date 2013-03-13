@@ -159,7 +159,8 @@
    :session-name (:graphs/name session)})
 
 (defn list-user-session-keys [connection]
-  (.send connection (generate-string {:sessions (map describe-open-session (all-sessions))})))
+  (.send connection (generate-string {:type :session-listing
+                                      :sessions (map describe-open-session (all-sessions))})))
 
 (defn persist-empty-graph [session-id graph-name]
   (send (graph-agent session-id) identity))
