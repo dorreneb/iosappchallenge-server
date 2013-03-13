@@ -99,11 +99,20 @@
              (= element-id (str (:id element))))
            (map list @(graph-agent session-id) (range))))))
 
+(defn dispatch-move-box-to-client [who body]
+  (.send who (generate-string (merge {:type :move-box} {:body body}))))
+
+(defn exclusive-broadcast-move-box [session-id excluder body]
+  (doseq [c (exclude-client session-id excluder)]
+    (dispatch-move-box-to-client c (strip-locals body))))
+
 (defn move-box [{:keys [session-id body] :as message} me]
   (let [n (find-element session-id (:id body))]
     (dosync
      (send (graph-agent session-id) update-in [n :location]
-           (constantly {:x (:x body) :y (:y body)})))))
+           (constantly {:x (:x body) :y (:y body)}))
+     (dispatch-move-box-to-client me body)
+     (exclusive-broadcast-move-box session-id me body))))
 
 (defmulti update-graph
   (fn [message connection]
