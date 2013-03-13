@@ -114,12 +114,27 @@
      (dispatch-move-box-to-client me body)
      (exclusive-broadcast-move-box session-id me body))))
 
+(defn dispatch-create-connection-to-client [who body]
+  (.send who (generate-string {:body body})))
+
+(defn exclusive-broadcast-create-connection [session-id excluder body]
+  (doseq [c (exclude-client session-id excluder)]
+    (dispatch-create-connection-to-client c (strip-locals body))))
+
+(defn create-connection [{:keys [session-id body] :as message} me]
+  (let [body (assoc body :id (uuid) :type :create-connection)]
+    (dosync
+     (send (graph-agent session-id) conj (assoc (strip-locals body) :type :connection))
+     (dispatch-create-connection-to-client me body)
+     (exclusive-broadcast-create-connection session-id me body))))
+
 (defmulti update-graph
   (fn [message connection]
     (:type message)))
 
 (defmethod update-graph "create" [message requester] (create-box message requester))
 (defmethod update-graph "move-box" [message requester] (move-box message requester))
+(defmethod update-graph "create-connection" [message requester] (create-connection message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -198,6 +213,12 @@
 (with-pre-hook! #'move-box
   (fn [{:keys [session-id] :as message} connection]
     (println "Received move box event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'create-connection
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Received create connection event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
