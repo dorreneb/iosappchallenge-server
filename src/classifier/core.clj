@@ -10,7 +10,9 @@
 
 (defn uuid
   ([] (java.util.UUID/randomUUID))
-  ([x] (java.util.UUID/fromString x)))
+  ([x] (if (string? x)
+         (java.util.UUID/fromString x)
+         x)))
 
 ;;;;;;;;;;;; Datomic persistence ;;;;;;;;;;;;;;;;;
 
@@ -50,6 +52,18 @@
      (d/history (db connection))
      (:db/id id)
      :graphs/graph))
+
+(defn revision [tx-id]
+  (read-string
+   (ffirst
+    (q '[:find ?v
+         :in $ ?a ?tx-id 
+         :where
+         [?e ?a ?v ?tx _]
+         [(= ?tx-id ?tx)]]
+       (d/history (db connection))
+       :graphs/graph
+       tx-id))))
 
 (defn persist-session [session-id graph-name]
   (fn [_ _ _ state]
@@ -150,6 +164,9 @@
 (defn graph-revisions [{:keys [session-id body] :as message} me]
   (.send me (generate-string {:revisions (revisions (session (uuid session-id)))})))
 
+(defn spec-revision [{:keys [session-id transaction-id] :as message} me]
+  (.send me (generate-string {:revision (revision transaction-id)})))
+
 (defmulti update-graph
   (fn [message connection]
     (:type message)))
@@ -159,6 +176,7 @@
 (defmethod update-graph "create-connection" [message requester] (create-connection message requester))
 (defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
 (defmethod update-graph "revisions" [message requester] (graph-revisions message requester))
+(defmethod update-graph "spec-revision" [message requester] (spec-revision message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -257,6 +275,12 @@
 (with-pre-hook! #'graph-revisions
   (fn [{:keys [session-id] :as message} connection]
     (println "Received revision listing event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'spec-revision
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Getting revision on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
