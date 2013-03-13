@@ -128,6 +128,9 @@
      (dispatch-create-connection-to-client me body)
      (exclusive-broadcast-create-connection session-id me body))))
 
+(defn number-of-connections [{:keys [session-id body] :as message} me]
+  (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
+
 (defmulti update-graph
   (fn [message connection]
     (:type message)))
@@ -135,6 +138,7 @@
 (defmethod update-graph "create" [message requester] (create-box message requester))
 (defmethod update-graph "move-box" [message requester] (move-box message requester))
 (defmethod update-graph "create-connection" [message requester] (create-connection message requester))
+(defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -219,6 +223,12 @@
 (with-pre-hook! #'create-connection
   (fn [{:keys [session-id] :as message} connection]
     (println "Received create connection event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'number-of-connections
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Received n-connection event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
