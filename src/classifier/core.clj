@@ -92,11 +92,25 @@
      (dispatch-create-box-to-client me body)
      (exclusive-broadcast-create-box session-id me body))))
 
+(defn find-element [session-id element-id]
+  (second
+   (first (filter
+           (fn [[element k]]
+             (= element-id (str (:id element))))
+           (map list @(graph-agent session-id) (range))))))
+
+(defn move-box [{:keys [session-id body] :as message} me]
+  (let [n (find-element session-id (:id body))]
+    (dosync
+     (send (graph-agent session-id) update-in [n :location]
+           (constantly {:x (:x body) :y (:y body)})))))
+
 (defmulti update-graph
   (fn [message connection]
     (:type message)))
 
 (defmethod update-graph "create" [message requester] (create-box message requester))
+(defmethod update-graph "move-box" [message requester] (move-box message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -168,7 +182,13 @@
 
 (with-pre-hook! #'create-box
   (fn [{:keys [session-id] :as message} connection]
-    (println "Received creation event on:" session-id)
+    (println "Received box creation event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'move-box
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Received move box event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
