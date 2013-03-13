@@ -159,8 +159,9 @@
    :session-name (:graphs/name session)})
 
 (defn list-user-session-keys [connection]
-  (.send connection (generate-string {:type :session-listing
-                                      :sessions (map describe-open-session (all-sessions))})))
+  (.send connection
+         (generate-string {:type :session-listing
+                           :sessions (map describe-open-session (all-sessions))})))
 
 (defn persist-empty-graph [session-id graph-name]
   (send (graph-agent session-id) identity))
@@ -169,7 +170,7 @@
   (let [session-id (uuid)]
     (add-session! session-id graph-name [])
     (persist-empty-graph session-id graph-name)
-    (.send connection (generate-string {:session-id session-id :graph-name graph-name}))))
+    (.send connection (generate-string {:type :new-spec :session-id session-id :graph-name graph-name}))))
 
 (defn unknown-session-call [connection message])
 
