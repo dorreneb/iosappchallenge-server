@@ -8,8 +8,9 @@
 (declare add-session-route)
 (declare add-session!)
 
-(defn uuid []
-  (java.util.UUID/randomUUID))
+(defn uuid
+  ([] (java.util.UUID/randomUUID))
+  ([x] (java.util.UUID/fromString x)))
 
 ;;;;;;;;;;;; Datomic persistence ;;;;;;;;;;;;;;;;;
 
@@ -34,6 +35,21 @@
    (fn [[id]]
      (-> connection db (d/entity id)))
    (q '[:find ?e :where [?e :graphs/session-id]] (db connection))))
+
+(defn session [session-id]
+  (-> connection db
+      (d/entity
+       (ffirst (q '[:find ?e :in $ ?id :where [?e :graphs/session-id ?id]]
+                  (db connection) session-id)))))
+
+(defn revisions [id]
+  (q '[:find ?tx ?tx-time
+       :in $ ?e ?a
+       :where [?e ?a ?v ?tx _]
+       [?tx :db/txInstant ?tx-time]]
+     (d/history (db connection))
+     (:db/id id)
+     :graphs/graph))
 
 (defn persist-session [session-id graph-name]
   (fn [_ _ _ state]
@@ -131,6 +147,9 @@
 (defn number-of-connections [{:keys [session-id body] :as message} me]
   (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
 
+(defn graph-revisions [{:keys [session-id body] :as message} me]
+  (.send me (generate-string {:revisions (revisions (session (uuid session-id)))})))
+
 (defmulti update-graph
   (fn [message connection]
     (:type message)))
@@ -139,6 +158,7 @@
 (defmethod update-graph "move-box" [message requester] (move-box message requester))
 (defmethod update-graph "create-connection" [message requester] (create-connection message requester))
 (defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
+(defmethod update-graph "revisions" [message requester] (graph-revisions message requester))
 (defmethod update-graph :default [message requester] (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
@@ -231,6 +251,12 @@
 (with-pre-hook! #'number-of-connections
   (fn [{:keys [session-id] :as message} connection]
     (println "Received n-connection event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'graph-revisions
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Received revision listing event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
