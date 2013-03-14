@@ -91,10 +91,13 @@
 
 (defonce server (WebServers/createWebServer 8080))
 
+(defn logical-load-ordering [coll]
+  (sort-by #(keyword (:type %)) coll))
+
 (defn register-connection [session-id connection]
   (dosync
    (commute (connections-ref session-id) conj connection))
-  (.send connection (generate-string {:type :init :body @(graph-agent session-id)})))
+  (.send connection (generate-string {:type :init :body (logical-load-ordering @(graph-agent session-id))})))
 
 (defn unregister-connection [session-id connection]
   (dosync
@@ -191,7 +194,7 @@
   (let [spec (revision transaction-id)]
     (dosync
      (send (graph-agent session-id) (constantly spec))
-     (broadcast session-id (generate-string {:revert @(graph-agent session-id)})))))
+     (broadcast session-id (generate-string {:revert (logical-load-ordering @(graph-agent session-id))})))))
 
 (defmulti update-graph
   (fn [message connection]
