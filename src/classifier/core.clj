@@ -141,12 +141,21 @@
     (dispatch-move-box-to-client c (strip-locals body))))
 
 (defn move-box [{:keys [session-id body] :as message} me]
-  (let [n (find-element session-id (:id body))]
-    (dosync
+  (dosync
+   (let [n (find-element session-id (:id body))]
      (send (graph-agent session-id) update-in [n :location]
            (constantly {:x (:x body) :y (:y body)}))
      (dispatch-move-box-to-client me body)
      (exclusive-broadcast-move-box session-id me body))))
+
+(defn element-by-uuid [session-id element-id]
+  (first (filter #(= (uuid element-id) (:id %)) @(graph-agent session-id))))
+
+(defn delete-box [{:keys [session-id id] :as message}]
+  (dosync
+   (let [element (element-by-uuid session-id id)]
+     (send (graph-agent session-id) filter (partial = element))
+     (broadcast session-id (generate-string {:type :delete-box :id (:id element)})))))
 
 (defn dispatch-create-connection-to-client [who body]
   (.send who (generate-string {:body body})))
@@ -183,6 +192,7 @@
 
 (defmethod update-graph "create" [message requester] (create-box message requester))
 (defmethod update-graph "move-box" [message requester] (move-box message requester))
+(defmethod update-graph "delete-box" [message _] (delete-box message))
 (defmethod update-graph "create-connection" [message requester] (create-connection message requester))
 (defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
 (defmethod update-graph "revisions" [message requester] (graph-revisions message requester))
@@ -268,6 +278,12 @@
 (with-pre-hook! #'move-box
   (fn [{:keys [session-id] :as message} connection]
     (println "Received move box event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'delete-box
+  (fn [{:keys [session-id] :as message}]
+    (println "Received delete box event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
