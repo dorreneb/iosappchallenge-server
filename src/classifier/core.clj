@@ -171,6 +171,13 @@
      (dispatch-create-connection-to-client me body)
      (exclusive-broadcast-create-connection session-id me body))))
 
+(defn delete-connection [{:keys [session-id id] :as message}]
+  (dosync
+   (let [element (element-by-uuid session-id id)]
+     (send (graph-agent session-id)
+           (fn [state] (filter (partial not= element) state)))
+     (broadcast session-id (generate-string {:type :delete-connection :id (:id element)})))))
+
 (defn number-of-connections [{:keys [session-id body] :as message} me]
   (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
 
@@ -190,15 +197,35 @@
   (fn [message connection]
     (:type message)))
 
-(defmethod update-graph "create" [message requester] (create-box message requester))
-(defmethod update-graph "move-box" [message requester] (move-box message requester))
-(defmethod update-graph "delete-box" [message _] (delete-box message))
-(defmethod update-graph "create-connection" [message requester] (create-connection message requester))
-(defmethod update-graph "n-connections" [message requester] (number-of-connections message requester))
-(defmethod update-graph "revisions" [message requester] (graph-revisions message requester))
-(defmethod update-graph "spec-revision" [message requester] (spec-revision message requester))
-(defmethod update-graph "revert" [message _] (revert message))
-(defmethod update-graph :default [message requester] (unknown-api-call message requester))
+(defmethod update-graph "create" [message requester]
+  (create-box message requester))
+
+(defmethod update-graph "move-box" [message requester]
+  (move-box message requester))
+
+(defmethod update-graph "delete-box" [message _]
+  (delete-box message))
+
+(defmethod update-graph "create-connection" [message requester]
+  (create-connection message requester))
+
+(defmethod update-graph "delete-connection" [message _]
+  (delete-connection message))
+
+(defmethod update-graph "n-connections" [message requester]
+  (number-of-connections message requester))
+
+(defmethod update-graph "revisions" [message requester]
+  (graph-revisions message requester))
+
+(defmethod update-graph "spec-revision" [message requester]
+  (spec-revision message requester))
+
+(defmethod update-graph "revert" [message _]
+  (revert message))
+
+(defmethod update-graph :default [message requester]
+  (unknown-api-call message requester))
 
 (defn add-session-route [session-id]
   (.add server (str "/graph/" session-id)
@@ -290,6 +317,12 @@
 (with-pre-hook! #'create-connection
   (fn [{:keys [session-id] :as message} connection]
     (println "Received create connection event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'delete-connection
+  (fn [{:keys [session-id] :as message}]
+    (println "Received delete connection event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
