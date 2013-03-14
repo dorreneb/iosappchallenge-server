@@ -162,10 +162,31 @@
 (defn element-by-uuid [session-id element-id]
   (first (filter #(= (uuid element-id) (:id %)) @(graph-agent session-id))))
 
+(defn connectors-only [coll]
+  (filter (fn [entity] (= (keyword (:type entity)) :connection)) coll))
+
+(defn connectors-for-box [session-id box-id]
+  (filter
+   (fn [entity]
+     (or (= (:from entity) box-id)
+         (= (:to entity) box-id)))
+   (connectors-only @(graph-agent session-id))))
+
+(defn delete-connection [{:keys [session-id id] :as message}]
+  (dosync
+   (let [element (element-by-uuid session-id id)]
+     (send (graph-agent session-id) (fn [state] (filter (partial not= element) state)))
+     (broadcast session-id (generate-string {:type :delete-connection :id (:id element)})))))
+
+(defn delete-connectors-for-box [session-id id]
+  (doseq [connector-id (map :id (connectors-for-box session-id id))]
+    (delete-connection {:session-id session-id :id connector-id})))
+
 (defn delete-box [{:keys [session-id id] :as message}]
   (dosync
    (let [element (element-by-uuid session-id id)]
-     (send (graph-agent session-id) filter (partial = element))
+     (delete-connectors-for-box session-id id)
+     (send (graph-agent session-id) (fn [state] (filter (partial not= element) state)))
      (broadcast session-id (generate-string {:type :delete-box :id (:id element)})))))
 
 (defn dispatch-create-connection-to-client [who body]
@@ -181,13 +202,6 @@
      (send (graph-agent session-id) conj (strip-locals body))
      (dispatch-create-connection-to-client me body)
      (exclusive-broadcast-create-connection session-id me body))))
-
-(defn delete-connection [{:keys [session-id id] :as message}]
-  (dosync
-   (let [element (element-by-uuid session-id id)]
-     (send (graph-agent session-id)
-           (fn [state] (filter (partial not= element) state)))
-     (broadcast session-id (generate-string {:type :delete-connection :id (:id element)})))))
 
 (defn number-of-connections [{:keys [session-id body] :as message} me]
   (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
