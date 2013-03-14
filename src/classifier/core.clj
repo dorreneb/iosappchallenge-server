@@ -151,6 +151,14 @@
      (dispatch-move-box-to-client me body)
      (exclusive-broadcast-move-box session-id me body))))
 
+(defn rename-box [{:keys [session-id body] :as message} me]
+  (dosync
+   (let [n (find-element session-id (:id body))]
+     (send (graph-agent session-id)
+           (fn [state] (update-in (vec state) [n :name] (constantly (:name body)))))
+     (broadcast session-id (generate-string {:type :rename-box
+                                             :body {:id (:id body) :name (:name body)}})))))
+
 (defn element-by-uuid [session-id element-id]
   (first (filter #(= (uuid element-id) (:id %)) @(graph-agent session-id))))
 
@@ -202,6 +210,9 @@
 
 (defmethod update-graph "create" [message requester]
   (create-box message requester))
+
+(defmethod update-graph "rename-box" [message requester]
+  (rename-box message requester))
 
 (defmethod update-graph "move-box" [message requester]
   (move-box message requester))
@@ -302,6 +313,12 @@
 (with-pre-hook! #'create-box
   (fn [{:keys [session-id] :as message} connection]
     (println "Received box creation event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'rename-box
+  (fn [{:keys [session-id] :as message} connection]
+    (println "Received rename box event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
