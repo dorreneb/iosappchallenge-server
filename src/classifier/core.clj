@@ -161,16 +161,16 @@
      (broadcast session-id (generate-string {:type :delete-box :id (:id element)})))))
 
 (defn dispatch-create-connection-to-client [who body]
-  (.send who (generate-string {:body body})))
+  (.send who (generate-string {:type :create-connection :body body})))
 
 (defn exclusive-broadcast-create-connection [session-id excluder body]
   (doseq [c (exclude-client session-id excluder)]
     (dispatch-create-connection-to-client c (strip-locals body))))
 
 (defn create-connection [{:keys [session-id body] :as message} me]
-  (let [body (assoc body :id (uuid) :type :create-connection)]
+  (let [body (assoc body :id (uuid) :type :connection)]
     (dosync
-     (send (graph-agent session-id) conj (assoc (strip-locals body) :type :connection))
+     (send (graph-agent session-id) conj (strip-locals body))
      (dispatch-create-connection-to-client me body)
      (exclusive-broadcast-create-connection session-id me body))))
 
