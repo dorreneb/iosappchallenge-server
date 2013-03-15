@@ -146,8 +146,9 @@
 (defn move-box [{:keys [session-id body] :as message} me]
   (dosync
    (let [n (find-element session-id (:id body))]
-     (send (graph-agent session-id) update-in [n :location]
-           (constantly {:x (:x body) :y (:y body)}))
+     (send (graph-agent session-id)
+           (fn [state] (update-in (vec state) [n :location]
+                                  (constantly {:x (:x body) :y (:y body)}))))
      (dispatch-move-box-to-client me body)
      (exclusive-broadcast-move-box session-id me body))))
 
