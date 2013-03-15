@@ -105,23 +105,45 @@
     (println "\t" session-id)
     (println "-------------------------------------------------")))
 
+(defn graph-contains-id? [graph id]
+  (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1))
+
+(defn report-bad-id-failure
+  ([connection] (report-bad-id-failure connections :bad-id))
+  ([connection reason] (.send connections (generate-string {:success :false :why reason}))))
+
 (with-precondition! #'delete-box
-  :legal-id
-  (fn [graph {:keys [id]} _]
-    (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1)))
+  :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
+
+(with-precondition! #'rename-box
+  :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
+
+(with-precondition! #'move-box
+  :legal-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:id body))))
+
+(with-precondition! #'create-connection
+  :legal-from-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:from body))))
+
+(with-precondition! #'create-connection
+  :legal-to-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:to body))))
 
 (with-handler! #'delete-box
   {:precondition :legal-id}
-  (fn [e _ _ me]
-    (.send me (generate-string {:success :false :why :bad-id}))))
-
-(with-precondition! #'rename-box
-  :legal-id
-  (fn [graph {:keys [id]} _]
-    (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1)))
+  (fn [_ _ _ me] (report-bad-id-failure me)))
 
 (with-handler! #'rename-box
   {:precondition :legal-id}
-  (fn [e _ _ me]
-    (.send me (generate-string {:success :false :why :bad-id}))))
+  (fn [_ _ _ me] (report-bad-id-failure me)))
+
+(with-handler! #'move-box
+  {:precondition :legal-id}
+  (fn [_ _ _ me] (report-bad-id-failure me)))
+
+(with-handler! #'create-connection
+  {:precondition :legal-from-id}
+  (fn [_ _ _ me] (report-bad-id-failure me :bad-src-id)))
+
+(with-handler! #'create-connection
+  {:precondition :legal-to-id}
+  (fn [_ _ _ me] (report-bad-id-failure me :bad-dst-id)))
 
