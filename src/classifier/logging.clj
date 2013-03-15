@@ -109,8 +109,8 @@
   (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1))
 
 (defn report-bad-id-failure
-  ([connection] (report-bad-id-failure connections :bad-id))
-  ([connection reason] (.send connections (generate-string {:success :false :why reason}))))
+  ([socket] (report-bad-id-failure socket :bad-id))
+  ([socket reason] {:success false :why reason}))
 
 (with-precondition! #'delete-box
   :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
@@ -129,21 +129,21 @@
 
 (with-handler! #'delete-box
   {:precondition :legal-id}
-  (fn [_ _ _ me] (report-bad-id-failure me)))
+  (fn [e _ _ c] (report-bad-id-failure c)))
 
 (with-handler! #'rename-box
   {:precondition :legal-id}
-  (fn [_ _ _ me] (report-bad-id-failure me)))
+  (fn [e _ _ c] (report-bad-id-failure)))
 
 (with-handler! #'move-box
   {:precondition :legal-id}
-  (fn [_ _ _ me] (report-bad-id-failure me)))
+  (fn [e _ _ c] (report-bad-id-failure)))
 
 (with-handler! #'create-connection
   {:precondition :legal-from-id}
-  (fn [_ _ _ me] (report-bad-id-failure me :bad-src-id)))
+  (fn [e _ _ c] (report-bad-id-failure :bad-src-id)))
 
 (with-handler! #'create-connection
   {:precondition :legal-to-id}
-  (fn [_ _ _ me] (report-bad-id-failure me :bad-dst-id)))
+  (fn [e _ _ c] (report-bad-id-failure :bad-dst-id)))
 
