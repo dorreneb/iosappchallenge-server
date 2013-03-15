@@ -147,8 +147,9 @@
   (dosync
    (let [n (find-element session-id (:id body))]
      (send (graph-agent session-id)
-           (fn [state] (update-in (vec state) [n :location]
-                                  (constantly {:x (:x body) :y (:y body)}))))
+           (fn [state]
+             (update-in (vec state) [n :location]
+                        (constantly {:x (:x (:location body)) :y (:y (:location body))}))))
      (dispatch-move-box-to-client me body)
      (exclusive-broadcast-move-box session-id me body))))
 
