@@ -209,16 +209,16 @@
   (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
 
 (defn graph-revisions [{:keys [session-id body] :as message} me]
-  (.send me (generate-string {:revisions (revisions (session (uuid session-id)))})))
+  (.send me (generate-string {:type :revisions :revisions (revisions (session (uuid session-id)))})))
 
 (defn spec-revision [{:keys [transaction-id] :as message} me]
-  (.send me (generate-string {:revision (revision transaction-id)})))
+  (.send me (generate-string {:type :revision :revision (revision transaction-id)})))
 
 (defn revert [{:keys [session-id transaction-id]}]
   (let [spec (revision transaction-id)]
     (dosync
      (send (graph-agent session-id) (constantly spec))
-     (broadcast session-id (generate-string {:revert (logical-load-ordering @(graph-agent session-id))})))))
+     (broadcast session-id (generate-string {:type :revert :revert (logical-load-ordering @(graph-agent session-id))})))))
 
 (defmulti update-graph
   (fn [message connection]
