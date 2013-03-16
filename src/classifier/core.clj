@@ -212,6 +212,10 @@
   (.send me (generate-string {:n-connections (count @(connections-ref session-id))})))
 
 (defn graph-revisions [{:keys [session-id body] :as message} me]
+  (doseq [n (revisions (session (uuid session-id)))]
+    (println "~~~~~~~~~~")
+    (println n)
+    (println (revision (:transaction-id n))))
   (.send me (generate-string {:type :revisions :revisions (revisions (session (uuid session-id)))})))
 
 (defn spec-revision [{:keys [transaction-id] :as message} me]
@@ -227,10 +231,6 @@
   (dosync
    (let [spec (revision transaction-id)]
      (send (graph-agent session-id) (constantly spec))))
-  (prn "AND")
-  (prn "The state is: " @(graph-agent session-id))
-  (prn "AND")
-  (prn "Coming back: " (logical-load-ordering @(graph-agent session-id)))
   (broadcast session-id (generate-string {:type :revert :revert (logical-load-ordering @(graph-agent session-id))})))
 
 (defmulti update-graph
