@@ -164,6 +164,18 @@
      (broadcast session-id (generate-string {:type :rename-box
                                              :body {:id (:id body) :name (:name body)}})))))
 
+(defn update-connection [{:keys [session-id body] :as message} me]
+  (dosync
+   (let [n (find-element session-id (:id body))]
+     (send (graph-agent session-id)
+           (fn [state] (update-in (vec state) [n :start-arrow] (constantly (:start-arrow body)))))
+     (send (graph-agent session-id)
+           (fn [state] (update-in (vec state) [n :end-arrow] (constantly (:end-arrow body)))))
+     (broadcast session-id (generate-string {:type :update-connection
+                                             :body {:id (:id body)
+                                                    :start-arrow (:start-arrow body)
+                                                    :end-arrow (:end-arrow body)}})))))
+
 (defn element-by-uuid [session-id element-id]
   (first (filter #(= (uuid element-id) (:id %)) @(graph-agent session-id))))
 
@@ -227,16 +239,12 @@
      (prn "Hoping to revert to: " spec)
      (send (graph-agent session-id) (constantly spec))))
   (broadcast session-id (generate-string {:type :revert :revert (logical-load-ordering @(graph-agent session-id))}))
-
   (println "@@@@@@@@@@@@@@@@@@@@")
   (println "Revision dump:")
   (doseq [n (revisions (session (uuid session-id)))]
     (println "~~~~~~~~~~")
     (println n)
-    (println (revision (:transaction-id n))))
-
-
-  )
+    (println (revision (:transaction-id n)))))
 
 (defmulti update-graph
   (fn [message connection]
@@ -259,6 +267,9 @@
 
 (defmethod update-graph "delete-connection" [message _]
   (delete-connection message))
+
+(defmethod update-graph "update-connection" [message requester]
+  (update-connection message requester))
 
 (defmethod update-graph "n-connections" [message requester]
   (number-of-connections message requester))
@@ -377,6 +388,12 @@
 (with-pre-hook! #'delete-connection
   (fn [{:keys [session-id] :as message}]
     (println "Received delete connection event on:" session-id)
+    (println "\t" message)
+    (println "-------------------------------------------------")))
+
+(with-pre-hook! #'update-connection
+  (fn [{:keys [session-id] :as message}]
+    (println "Received update connection event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
 
