@@ -220,7 +220,12 @@
 (defn revert [{:keys [session-id transaction-id]}]
   (dosync
    (let [spec (revision transaction-id)]
-     (send (graph-agent session-id) (constantly spec))))
+     (prn "Reverting to: " spec)
+     (send (graph-agent session-id) (constantly spec))
+     (prn "AND")
+     (prn "The state is: " @(graph-agent session-id))
+     (prn "AND")
+     (prn "Coming back: " (logical-load-ordering @(graph-agent session-id)))))
   (broadcast session-id (generate-string {:type :revert :revert (logical-load-ordering @(graph-agent session-id))})))
 
 (defmulti update-graph
