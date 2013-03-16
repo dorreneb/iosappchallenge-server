@@ -45,7 +45,7 @@
                   (db connection) session-id)))))
 
 (defn revisions [id]
-  (reverse (sort-by :timestamp
+  (reverse (sort-by :transaction-id
                     (map (fn [[a b]]
                            {:transaction-id a :timestamp b})       
                          (q '[:find ?tx ?tx-time
