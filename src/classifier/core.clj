@@ -224,6 +224,7 @@
 (defn revert [{:keys [session-id transaction-id]}]
   (dosync
    (let [spec (revision transaction-id)]
+     (prn "Hoping to revert to: " spec)
      (send (graph-agent session-id) (constantly spec))))
   (broadcast session-id (generate-string {:type :revert :revert (logical-load-ordering @(graph-agent session-id))}))
 
