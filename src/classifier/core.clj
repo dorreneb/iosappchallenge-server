@@ -45,16 +45,16 @@
                   (db connection) session-id)))))
 
 (defn revisions [id]
-  (sort-by :timestamp
-           (map (fn [[a b]]
-                  {:transaction-id a :timestamp b})       
-                (q '[:find ?tx ?tx-time
-                     :in $ ?e ?a
-                     :where [?e ?a ?v ?tx _]
-                     [?tx :db/txInstant ?tx-time]]
-                   (d/history (db connection))
-                   (:db/id id)
-                   :graphs/graph))))
+  (reverse (sort-by :timestamp
+                    (map (fn [[a b]]
+                           {:transaction-id a :timestamp b})       
+                         (q '[:find ?tx ?tx-time
+                              :in $ ?e ?a
+                              :where [?e ?a ?v ?tx _]
+                              [?tx :db/txInstant ?tx-time]]
+                            (d/history (db connection))
+                            (:db/id id)
+                            :graphs/graph)))))
 
 (defn revision [tx-id]
   (read-string
