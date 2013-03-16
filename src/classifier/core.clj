@@ -218,6 +218,10 @@
   (.send me (generate-string {:type :revision :revision (revision transaction-id)})))
 
 (defn revert [{:keys [session-id transaction-id]}]
+  (println "@@@@@@@@@@@@@@@@@@@@")
+  (println "Revision dump:")
+  (doseq [n (revisions (session (uuid session-id)))]
+    (println n ": " (revision n)))
   (dosync
    (let [spec (revision transaction-id)]
      (send (graph-agent session-id) (constantly spec))))
