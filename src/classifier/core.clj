@@ -221,7 +221,9 @@
   (println "@@@@@@@@@@@@@@@@@@@@")
   (println "Revision dump:")
   (doseq [n (revisions (session (uuid session-id)))]
-    (println n))
+    (println "~~~~~~~~~~")
+    (println n)
+    (println (revision (:transaction-id n))))
   (dosync
    (let [spec (revision transaction-id)]
      (send (graph-agent session-id) (constantly spec))))
