@@ -12,4 +12,6 @@
   (fact (:success response) => false)
   (fact (:why response) => :bad-id))
 
-
+(let [response (create-connection (agent [{:type "box" :id id}]) {:from id} :me)]
+  (fact (:success response) => false)
+  (fact (:why response) => :bad-dst-id))

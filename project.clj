@@ -9,7 +9,7 @@
                  [com.stuartsierra/lazytest "1.2.3"]
                  [midje "1.4.0"]
                  [cheshire "5.0.2"]
-                 [dire "0.3.0"]
+                 [dire "0.4.0"]
                  [com.datomic/datomic-free "0.8.3664"]]
   :plugins [[lein-midje "2.0.3"]]
   :main classifier.core)

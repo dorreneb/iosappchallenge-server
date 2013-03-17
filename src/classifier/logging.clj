@@ -46,7 +46,7 @@
     (println "-------------------------------------------------")))
 
 (with-pre-hook! #'create-connection
-  (fn [{:keys [session-id] :as message} connection]
+  (fn [graph {:keys [session-id] :as message} connection]
     (println "Received create connection event on:" session-id)
     (println "\t" message)
     (println "-------------------------------------------------")))
@@ -109,8 +109,8 @@
   (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1))
 
 (defn report-bad-id-failure
-  ([socket] (report-bad-id-failure socket :bad-id))
-  ([socket reason] {:success false :why reason}))
+  ([] (report-bad-id-failure :bad-id))
+  ([reason] {:success false :why reason}))
 
 (with-precondition! #'delete-box
   :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
@@ -129,7 +129,7 @@
 
 (with-handler! #'delete-box
   {:precondition :legal-id}
-  (fn [e _ _ c] (report-bad-id-failure c)))
+  (fn [e _ _ c] (report-bad-id-failure)))
 
 (with-handler! #'rename-box
   {:precondition :legal-id}

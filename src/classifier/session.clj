@@ -193,7 +193,7 @@
   (doseq [c (exclude-client session-id excluder)]
     (dispatch-create-connection-to-client c (strip-locals body))))
 
-(defn create-connection [{:keys [session-id body] :as message} me]
+(defn create-connection [graph {:keys [session-id body] :as message} me]
   (let [body (assoc body :id (uuid) :type :connection)]
     (dosync
      (send (graph-agent session-id) conj (strip-locals body))
