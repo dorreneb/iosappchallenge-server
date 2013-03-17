@@ -113,19 +113,24 @@
   ([reason] {:success false :why reason}))
 
 (with-precondition! #'delete-box
-  :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
+  :legal-id (fn [graph {:keys [id]} _]
+              (graph-contains-id? graph id)))
 
 (with-precondition! #'rename-box
-  :legal-id (fn [graph {:keys [id]} _] (graph-contains-id? graph id)))
+  :legal-id (fn [graph {:keys [id]} _]
+              (graph-contains-id? graph id)))
 
 (with-precondition! #'move-box
-  :legal-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:id body))))
+  :legal-id (fn [graph {:keys [body]} _]
+              (graph-contains-id? graph (:id body))))
 
 (with-precondition! #'create-connection
-  :legal-from-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:from body))))
+  :legal-from-id (fn [graph {:keys [body]} _]
+                   (graph-contains-id? graph (:from body))))
 
 (with-precondition! #'create-connection
-  :legal-to-id (fn [graph {:keys [body]} _] (graph-contains-id? graph (:to body))))
+  :legal-to-id (fn [graph {:keys [body]} _]
+                 (graph-contains-id? graph (:to body))))
 
 (with-handler! #'delete-box
   {:precondition :legal-id}
