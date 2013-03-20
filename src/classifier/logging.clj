@@ -1,6 +1,6 @@
 (ns classifier.logging
-  (:require [dire.core :refer [with-pre-hook! with-precondition! with-handler!]]
-            [cheshire.core :refer [generate-string]]
+  (:require [clojure.tools.logging :refer [info error]]
+            [dire.core :refer [with-pre-hook!]]
             [classifier.session :refer :all]))
 
 (with-pre-hook! #'register-connection
@@ -23,9 +23,7 @@
 
 (with-pre-hook! #'create-box
   (fn [{:keys [session-id] :as message} connection]
-    (println "Received box creation event on:" session-id)
-    (println "\t" message)
-    (println "-------------------------------------------------")))
+    (info "Creating box on session " session-id " with message " message)))
 
 (with-pre-hook! #'rename-box
   (fn [{:keys [session-id] :as message} connection]
@@ -104,51 +102,4 @@
     (println "Saving a new graph via Datomic for:")
     (println "\t" session-id)
     (println "-------------------------------------------------")))
-
-(defn graph-contains-id? [graph id]
-  (= (count (filter (fn [element] (= (uuid id) (:id element))) @graph)) 1))
-
-(defn report-bad-id-failure
-  ([] (report-bad-id-failure :bad-id))
-  ([reason] {:success false :why reason}))
-
-(with-precondition! #'delete-box
-  :legal-id (fn [graph {:keys [id]} _]
-              (graph-contains-id? graph id)))
-
-(with-precondition! #'rename-box
-  :legal-id (fn [graph {:keys [id]} _]
-              (graph-contains-id? graph id)))
-
-(with-precondition! #'move-box
-  :legal-id (fn [graph {:keys [body]} _]
-              (graph-contains-id? graph (:id body))))
-
-(with-precondition! #'create-connection
-  :legal-from-id (fn [graph {:keys [body]} _]
-                   (graph-contains-id? graph (:from body))))
-
-(with-precondition! #'create-connection
-  :legal-to-id (fn [graph {:keys [body]} _]
-                 (graph-contains-id? graph (:to body))))
-
-(with-handler! #'delete-box
-  {:precondition :legal-id}
-  (fn [e _ _ c] (report-bad-id-failure)))
-
-(with-handler! #'rename-box
-  {:precondition :legal-id}
-  (fn [e _ _ c] (report-bad-id-failure)))
-
-(with-handler! #'move-box
-  {:precondition :legal-id}
-  (fn [e _ _ c] (report-bad-id-failure)))
-
-(with-handler! #'create-connection
-  {:precondition :legal-from-id}
-  (fn [e _ _ c] (report-bad-id-failure :bad-src-id)))
-
-(with-handler! #'create-connection
-  {:precondition :legal-to-id}
-  (fn [e _ _ c] (report-bad-id-failure :bad-dst-id)))
 

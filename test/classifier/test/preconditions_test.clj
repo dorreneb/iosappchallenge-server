@@ -1,7 +1,7 @@
 (ns classifier.test.preconditions-test
   (:require [midje.sweet :refer :all]
             [classifier.session :refer :all]
-            [classifier.logging :refer :all]))
+            [classifier.preconditions :refer :all]))
 
 (def id #uuid "0468d64a-ad80-43e3-b24c-ae3253be196a")
 
