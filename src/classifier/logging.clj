@@ -1,7 +1,17 @@
 (ns classifier.logging
-  (:require [clojure.tools.logging :refer [info error]]
-            [dire.core :refer [with-pre-hook!]]
-            [classifier.session :refer :all]))
+  (:require [dire.core :refer [with-pre-hook!]]
+            [classifier.session :refer :all])
+  (:import java.util.logging.Logger
+           java.util.logging.FileHandler))
+
+(def logger (Logger/getLogger "jotspec"))
+(.addHandler logger (new FileHandler "log/server.log"))
+
+(defn info [& data]
+  (.info logger (apply str data)))
+
+(defn error [& data]
+  (.error logger (apply str data)))
 
 (with-pre-hook! #'register-connection
   (fn [session-id connection]
