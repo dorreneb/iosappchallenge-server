@@ -1,6 +1,7 @@
 (ns classifier.session
   (:require [cheshire.core :refer [generate-string parse-string]]
-            [datomic.api :refer [q db] :as d])
+            [datomic.api :refer [q db] :as d]
+            [dire.core :refer :all])
   (:import [org.webbitserver WebServer WebServers WebSocketHandler HttpHandler]
            [org.webbitserver.handler StaticFileHandler]))
 

@@ -1,5 +1,5 @@
 (ns classifier.logging
-  (:require [clojure.tools.logging :refer [info error fatal]]
+  (:require [clojure.tools.logging :refer [info error]]
             [dire.core :refer [with-pre-hook!]]
             [classifier.session :refer :all]))
 
@@ -61,7 +61,7 @@
 
 (with-pre-hook! #'persist-empty-graph
   (fn [session-id graph-name]
-    ("Creating a new, blank spec for " session-id " named " graph-name)))
+    (info "Creating a new, blank spec for " session-id " named " graph-name)))
 
 (with-pre-hook! #'unknown-api-call
   (fn [message connection]
