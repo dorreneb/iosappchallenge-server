@@ -1,4 +1,4 @@
-(ns classifier.session
+(ns classifier.server
   (:require [cheshire.core :refer [generate-string parse-string]]))
 
 (defn encode [data]
